@@ -1,0 +1,13 @@
+# 默认审阅者：仓库所有者
+# 请根据实际情况修改为团队核心成员或组织名称
+* @Flouxtine
+
+# 工具代码变更需要 core 团队审核
+/aliyun_mcp/tools/ @Flouxtine
+/aliyun_mcp/core/ @Flouxtine
+
+# 账号配置变更需要安全审核
+/aliyun_mcp/config/ @Flouxtine
+
+# 文档变更（可选指定文档维护者）
+/docs/ @Flouxtine
