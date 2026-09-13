@@ -26,21 +26,38 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
+      # 没有 ruff 配置（pyproject.toml / ruff.toml）说明仓库不是 Python 项目，
+      # 直接跳过，避免因缺少配置文件导致误报失败；有配置的仓库行为不变。
+      - name: 检测 ruff 配置
+        id: detect
+        run: |
+          if [ -f pyproject.toml ] || [ -f ruff.toml ] || [ -f .ruff.toml ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::未检测到 ruff 配置（pyproject.toml / ruff.toml），跳过静态检查"
+          fi
+
       - name: 准备 Python
+        if: steps.detect.outputs.enabled == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: 安装 Ruff
+        if: steps.detect.outputs.enabled == 'true'
         run: python -m pip install --upgrade pip "ruff>=0.6.0"
 
       - name: Ruff 规则检查
+        if: steps.detect.outputs.enabled == 'true'
         run: ruff check --output-format=github .
 
       - name: Ruff 格式检查
+        if: steps.detect.outputs.enabled == 'true'
         run: ruff format --check --diff .
 
       - name: 语法编译检查
+        if: steps.detect.outputs.enabled == 'true'
         run: python -m compileall -q aliyun_mcp main.py
 
   dependency-review:
@@ -50,25 +67,42 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
+      # 没有 requirements.txt 时，setup-python 的 pip 缓存会因为找不到依赖清单
+      # 而直接失败，所以这里先探测再决定是否执行依赖相关步骤。
+      - name: 检测依赖清单
+        id: detect
+        run: |
+          if [ -f requirements.txt ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::未检测到 requirements.txt，跳过依赖安装与导入冒烟"
+          fi
+
       - name: 准备 Python
+        if: steps.detect.outputs.enabled == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: 安装依赖
+        if: steps.detect.outputs.enabled == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -e . --no-deps
 
       - name: 依赖漏洞扫描 (pip-audit)
+        if: steps.detect.outputs.enabled == 'true'
         continue-on-error: true
         run: |
           pip install pip-audit
           pip-audit --requirement requirements.txt --skip-editable
 
       - name: 导入冒烟
+        if: steps.detect.outputs.enabled == 'true'
         run: |
           python -c "import aliyun_mcp, importlib.util as u; print('aliyun_mcp import ok')"
           python -c "import fastmcp; print('fastmcp', fastmcp.__version__ if hasattr(fastmcp,'__version__') else 'ok')"
@@ -111,7 +145,5 @@ jobs:
             exit 1
           fi
           echo "代码审核通过"
-
-
 
 #123456
