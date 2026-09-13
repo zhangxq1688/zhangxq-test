@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """扫描本次提交的增量内容，检测可能泄漏的密钥/凭证。
 
 由 GitHub Actions 调用，也可本地运行：
@@ -7,6 +6,7 @@
 
 输出 GitHub Actions 注解（::error / ::warning）；命中 error 级别规则时以非 0 退出。
 """
+
 from __future__ import annotations
 
 import os
@@ -17,7 +17,7 @@ import sys
 LEVEL_ERROR = "error"
 LEVEL_WARNING = "warning"
 
-RULES: list[tuple[str, "re.Pattern[str]", str]] = [
+RULES: list[tuple[str, re.Pattern[str], str]] = [
     ("阿里云 AccessKey ID", re.compile(r"\bLTAI[A-Za-z0-9]{12,20}\b"), LEVEL_ERROR),
     ("AWS Access Key ID", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"), LEVEL_ERROR),
     ("GitHub Token", re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}\b"), LEVEL_ERROR),
@@ -55,6 +55,7 @@ def run_git(*args: str) -> str:
         text=True,
         encoding="utf-8",
         errors="replace",
+        check=False,
     )
     if result.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)} 执行失败: {result.stderr.strip()}")
@@ -72,6 +73,7 @@ def shas() -> tuple[str, str]:
         result = subprocess.run(
             ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
             capture_output=True,
+            check=False,
         )
         return result.returncode == 0
 
@@ -96,7 +98,7 @@ def iter_changed_lines(base: str, head: str):
             target = raw[4:].strip()
             path = None if target == "/dev/null" else target.removeprefix("b/")
             continue
-        if raw.startswith("--- ") or raw.startswith("diff "):
+        if raw.startswith(("--- ", "diff ")):
             continue
 
         match = re.match(r"@@ -\S+ \+(\d+)(?:,(\d+))? @@", raw)
